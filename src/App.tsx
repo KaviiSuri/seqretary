@@ -1,26 +1,25 @@
-import React, { useRef } from "react";
-import { useAppVisible } from "./utils";
+import {
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import React from "react";
+import { Accordion } from "./components/ui/accordion";
+import { ChatInterface } from "./components/ChatInterface";
 
 function App() {
-  const innerRef = useRef<HTMLDivElement>(null);
-  const visible = useAppVisible();
-  if (visible) {
-    return (
-      <main
-        className="backdrop-filter backdrop-blur-md fixed inset-0 flex items-center justify-center"
-        onClick={(e) => {
-          if (!innerRef.current?.contains(e.target as any)) {
-            window.logseq.hideMainUI();
-          }
-        }}
-      >
-        <div ref={innerRef} className="text-size-2em">
-          Welcome to [[Logseq]] Plugins!
-        </div>
-      </main>
-    );
-  }
-  return null;
+  return (
+    <div className="w-full p-4">
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="item-1">
+          <AccordionTrigger>Seqretary</AccordionTrigger>
+          <AccordionContent className="p-2">
+            <ChatInterface />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
+  );
 }
 
 export default App;
