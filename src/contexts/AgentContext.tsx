@@ -99,43 +99,69 @@ interface Block {
   "block/content": string;
 }
 
-const processBlocks = (blocks: Block[]): string => {
-  return blocks
-    .map((block) => {
-      const content = block["block/content"];
-      const children = block["block/children"];
-      if (!children?.length) return content;
-      return `${content}\n${processBlocks(children)
-        .split("\n")
-        .map((line) => `  ${line}`)
-        .join("\n")}`;
-    })
-    .join("\n");
-};
-export function useAgent(agentInfo: AgentInfo | null) {
-  const query = useMemo(() => {
-    if (!agentInfo?.name) return '';
-    return `
+interface NestedBlock {
+  content: string;
+  _parent?: NestedBlock[];
+}
+
+const getHeadingContentPrompt = (agentInfo: AgentInfo, heading: string) => {
+  return `
     [:find (pull ?b [:block/content :block/properties {:block/_parent ...}])
      :where
-     [?p :block/name "${agentInfo?.name}"]
+     [?p :block/name "${agentInfo.name}"]
      [?parent :block/page ?p]
-     [?parent :block/content "## System Prompt"]
+     [?parent :block/content "${heading}"]
      [?b :block/parent ?parent]]
   `;
-  }, [agentInfo?.name]);
+};
 
-  const { results: blocks, loading } = useLogseqQuery<Block[]>(
-    query,
-    {
-      enabled: Boolean(agentInfo?.name),
-    }
-  );
+const useHeadingContent = (agentInfo: AgentInfo | null, heading: string) => {
+  const query = useMemo(() => {
+    if (!agentInfo) return "";
+    return getHeadingContentPrompt(agentInfo, heading);
+  }, [agentInfo, heading]);
 
-  console.log("blocks", blocks);
+  const { results: blocks, loading } = useLogseqQuery<Block[]>(query, {
+    enabled: Boolean(agentInfo?.name),
+  });
 
   return {
     blocks,
     loading,
+  };
+};
+
+const blockToMarkdown = (block: NestedBlock, level = 0): string => {
+  const indent = '  '.repeat(level);
+  let markdown = `${indent}- ${block.content}\n`;
+  
+  if (block._parent && Array.isArray(block._parent)) {
+    markdown += block._parent
+      .map(child => blockToMarkdown(child, level + 1))
+      .join('');
+  }
+  
+  return markdown;
+};
+
+const resultsToMarkdown = (results: NestedBlock[][]): string => {
+  if (!results || !results.length) return '';
+  return results
+    .flat()
+    .map(block => blockToMarkdown(block))
+    .join('');
+};
+
+export function useAgent(agentInfo: AgentInfo | null) {
+  const { blocks: systemPrompt, loading: systemPromptLoading } = useHeadingContent(agentInfo, "## System Prompt");
+  const { blocks: memory, loading: memoryLoading } = useHeadingContent(agentInfo, "## Memory");
+
+  const systemPromptMarkdown = systemPrompt ? resultsToMarkdown(systemPrompt) : '';
+  const memoryMarkdown = memory ? resultsToMarkdown(memory) : '';
+
+  return {
+    loading: systemPromptLoading || memoryLoading,
+    systemPrompt: systemPromptMarkdown,
+    memory: memoryMarkdown,
   };
 }
