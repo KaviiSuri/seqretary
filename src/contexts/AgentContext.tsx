@@ -152,6 +152,27 @@ const resultsToMarkdown = (results: NestedBlock[][]): string => {
     .join('');
 };
 
+export const usePageSearch = (query: string) => {
+  const searchQuery = useMemo(() => {
+    if (!query) return '';
+    return `
+      [:find (pull ?p [:block/name :block/properties])
+       :where
+       [?p :block/name ?name]
+       [(clojure.string/includes? ?name "${query.toLowerCase()}")]]
+    `;
+  }, [query]);
+
+  const { results: pages, loading } = useLogseqQuery<Page[]>(searchQuery, {
+    enabled: Boolean(query),
+  });
+
+  return {
+    pages: pages.flat() || [],
+    loading
+  };
+};
+
 export function useAgent(agentInfo: AgentInfo | null) {
   const { blocks: systemPrompt, loading: systemPromptLoading } = useHeadingContent(agentInfo, "## System Prompt");
   const { blocks: memory, loading: memoryLoading } = useHeadingContent(agentInfo, "## Memory");
